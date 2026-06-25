@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using VoiceTray.Contracts.Clipboard;
 
 namespace VoiceTray.Infrastructure.Clipboard;
 

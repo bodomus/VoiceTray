@@ -1,6 +1,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.Extensions.Logging;
+using VoiceTray.Contracts.Tray;
 
 namespace VoiceTray.Infrastructure.Tray;
 
@@ -33,7 +34,7 @@ public sealed class TrayIconService(ILogger<TrayIconService> logger) : ITrayIcon
     }
 
     private static Icon GetApplicationIcon()
-        => Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? Application.ExecutablePath) ?? SystemIcons.Application;
+        => Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? System.Windows.Forms.Application.ExecutablePath) ?? SystemIcons.Application;
 
     public void Dispose()
     {

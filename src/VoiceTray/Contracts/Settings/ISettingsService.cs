@@ -1,4 +1,4 @@
-namespace VoiceTray.Infrastructure.Settings;
+namespace VoiceTray.Contracts.Settings;
 
 public interface ISettingsService
 {

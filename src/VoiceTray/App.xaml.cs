@@ -2,6 +2,13 @@ using System.Windows;
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using VoiceTray.Application.Dictation;
+using VoiceTray.Contracts.Audio;
+using VoiceTray.Contracts.Clipboard;
+using VoiceTray.Contracts.HotKeys;
+using VoiceTray.Contracts.Settings;
+using VoiceTray.Contracts.Speech;
+using VoiceTray.Contracts.Tray;
 using VoiceTray.Infrastructure.Audio;
 using VoiceTray.Infrastructure.Clipboard;
 using VoiceTray.Infrastructure.HotKeys;
@@ -35,7 +42,7 @@ public partial class App : System.Windows.Application
         var settings = await settingsService.LoadAsync(CancellationToken.None);
         _serviceProvider.GetRequiredService<AppSettingsHolder>().Current = settings;
 
-        _serviceProvider.GetRequiredService<IAudioRecorder>().DeleteOldTemporaryFiles(TimeSpan.FromDays(3));
+        _serviceProvider.GetRequiredService<IAudioRecorder>().DeleteOldTemporaryFiles(settings.Storage);
 
         var window = MainWindowInstance;
         MainWindow = window;
@@ -66,6 +73,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddSingleton<IClipboardService, WindowsClipboardService>();
         services.AddSingleton<ITextPasteService, WindowsTextPasteService>();
+        services.AddSingleton<IDictationWorkflowService, DictationWorkflowService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
 

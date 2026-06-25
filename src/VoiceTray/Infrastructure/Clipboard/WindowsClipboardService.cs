@@ -1,3 +1,5 @@
+using VoiceTray.Contracts.Clipboard;
+
 namespace VoiceTray.Infrastructure.Clipboard;
 
 public sealed class WindowsClipboardService : IClipboardService

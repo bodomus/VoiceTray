@@ -1,7 +1,7 @@
 using System.Windows;
-using VoiceTray.Infrastructure.Settings;
+using VoiceTray.Contracts.Settings;
 
-namespace VoiceTray.Infrastructure.HotKeys;
+namespace VoiceTray.Contracts.HotKeys;
 
 public interface IGlobalHotKeyService : IDisposable
 {

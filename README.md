@@ -24,13 +24,23 @@ On first launch the app creates `settings.json` near `VoiceTray.exe`. A referenc
 ```json
 {
   "HotKey": {
-    "Gesture": "Ctrl+Alt+Space"
+    "Gesture": "Ctrl+Alt+Space",
+    "Modifiers": "Control,Alt",
+    "Key": "Space",
+    "NoRepeat": true
   },
   "Whisper": {
     "ExecutablePath": "tools/whisper/whisper-cli.exe",
     "ModelPath": "models/ggml-base.bin",
     "Language": "ru",
     "ExtraArguments": ""
+  },
+  "Storage": {
+    "RecordingDirectory": "A:\\VoiceTray\\Recordings",
+    "TemporaryFileRetentionDays": 3
+  },
+  "Cancellation": {
+    "RecognitionTimeoutSeconds": 120
   },
   "Behavior": {
     "AutoCopyAfterRecognition": false,
@@ -43,6 +53,17 @@ On first launch the app creates `settings.json` near `VoiceTray.exe`. A referenc
 Relative paths are resolved from the application directory.
 
 `Language` defaults to `ru` so Russian dictation is recognized as Cyrillic text. Older `settings.json` files with `Language` set to `auto` are treated as `ru` by the app.
+
+`Storage` controls where WAV recordings are written and how many days temporary files are retained. `Cancellation` controls the recognition timeout. `HotKey` exposes the gesture, modifier list, key, and `MOD_NOREPEAT` behavior explicitly.
+
+## Architecture
+
+VoiceTray keeps contracts, application workflow, and infrastructure implementations separated:
+
+- `Contracts/` contains service interfaces, settings DTOs, and shared DTOs.
+- `Application/Dictation/` contains the dictation workflow service that coordinates recording, recognition, auto-copy, auto-paste, and cancellation behavior.
+- `Infrastructure/` contains Windows, NAudio, whisper.cpp, JSON settings, tray, clipboard, hotkey, and logging implementations.
+- `MainWindowViewModel` coordinates UI state and delegates dictation flow to `IDictationWorkflowService`.
 
 ## Hotkey
 

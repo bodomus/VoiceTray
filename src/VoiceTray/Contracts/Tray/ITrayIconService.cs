@@ -1,4 +1,4 @@
-namespace VoiceTray.Infrastructure.Tray;
+namespace VoiceTray.Contracts.Tray;
 
 public interface ITrayIconService : IDisposable
 {

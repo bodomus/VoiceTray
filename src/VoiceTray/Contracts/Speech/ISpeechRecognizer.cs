@@ -1,4 +1,4 @@
-namespace VoiceTray.Infrastructure.Speech;
+namespace VoiceTray.Contracts.Speech;
 
 public interface ISpeechRecognizer
 {

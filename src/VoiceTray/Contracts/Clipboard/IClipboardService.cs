@@ -1,4 +1,4 @@
-namespace VoiceTray.Infrastructure.Clipboard;
+namespace VoiceTray.Contracts.Clipboard;
 
 public interface IClipboardService
 {

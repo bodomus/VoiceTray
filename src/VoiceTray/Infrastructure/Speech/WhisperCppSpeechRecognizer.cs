@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using Microsoft.Extensions.Logging;
+using VoiceTray.Contracts.Speech;
 
 namespace VoiceTray.Infrastructure.Speech;
 

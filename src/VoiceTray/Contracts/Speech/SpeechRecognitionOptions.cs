@@ -1,6 +1,6 @@
-using VoiceTray.Infrastructure.Settings;
+using VoiceTray.Contracts.Settings;
 
-namespace VoiceTray.Infrastructure.Speech;
+namespace VoiceTray.Contracts.Speech;
 
 public sealed record SpeechRecognitionOptions(
     string ExecutablePath,

@@ -1,20 +1,16 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
-using VoiceTray.Infrastructure.Audio;
-using VoiceTray.Infrastructure.Clipboard;
-using VoiceTray.Infrastructure.Settings;
-using VoiceTray.Infrastructure.Speech;
+using VoiceTray.Application.Dictation;
+using VoiceTray.Contracts.Clipboard;
 
 namespace VoiceTray;
 
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    private readonly IAudioRecorder _audioRecorder;
-    private readonly ISpeechRecognizer _speechRecognizer;
+    private readonly IDictationWorkflowService _dictationWorkflow;
     private readonly IClipboardService _clipboardService;
     private readonly ITextPasteService _textPasteService;
-    private readonly AppSettingsHolder _settingsHolder;
     private readonly ILogger<MainWindowViewModel> _logger;
     private CancellationTokenSource? _operationCancellationTokenSource;
 
@@ -37,18 +33,14 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private string _statusText = "Ready";
 
     public MainWindowViewModel(
-        IAudioRecorder audioRecorder,
-        ISpeechRecognizer speechRecognizer,
+        IDictationWorkflowService dictationWorkflow,
         IClipboardService clipboardService,
         ITextPasteService textPasteService,
-        AppSettingsHolder settingsHolder,
         ILogger<MainWindowViewModel> logger)
     {
-        _audioRecorder = audioRecorder;
-        _speechRecognizer = speechRecognizer;
+        _dictationWorkflow = dictationWorkflow;
         _clipboardService = clipboardService;
         _textPasteService = textPasteService;
-        _settingsHolder = settingsHolder;
         _logger = logger;
     }
 
@@ -62,7 +54,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
             _operationCancellationTokenSource?.Dispose();
             _operationCancellationTokenSource = new CancellationTokenSource();
 
-            await _audioRecorder.StartAsync(_operationCancellationTokenSource.Token);
+            await _dictationWorkflow.StartAsync(_operationCancellationTokenSource.Token);
             IsRecording = true;
             StatusText = "Recording...";
         }
@@ -86,37 +78,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
         try
         {
             StatusText = "Recognizing...";
-            var recordingResult = await _audioRecorder.StopAsync(cancellationToken);
+            var result = await _dictationWorkflow.StopAndRecognizeAsync(MemoText, cancellationToken);
             IsRecording = false;
-            IsRecognizing = true;
+            IsRecognizing = false;
 
-            var options = SpeechRecognitionOptions.FromSettings(_settingsHolder.Current.Whisper);
-            var result = await _speechRecognizer.RecognizeAsync(recordingResult.FilePath, options, cancellationToken);
-            if (!string.IsNullOrWhiteSpace(result.Text))
+            if (!string.IsNullOrWhiteSpace(result.RecognizedText))
             {
-                MemoText = AppendText(MemoText, result.Text.Trim());
-                StatusText = "Text recognized";
-
-                if (_settingsHolder.Current.Behavior.AutoCopyAfterRecognition)
-                {
-                    _clipboardService.SetText(MemoText);
-                    StatusText = "Copied";
-                }
-
-                if (_settingsHolder.Current.Behavior.AutoPasteAfterRecognition)
-                {
-                    await _textPasteService.PasteAsync(MemoText, cancellationToken);
-                    StatusText = "Pasted";
-                }
+                MemoText = result.RecognizedText;
             }
-            else
-            {
-                StatusText = "Text recognized: empty result";
-            }
+
+            StatusText = result.Status;
         }
         catch (OperationCanceledException)
         {
             StatusText = "Ready";
+        }
+        catch (TimeoutException ex)
+        {
+            _logger.LogError(ex, "Recognition timed out.");
+            StatusText = $"Error: {ex.Message}";
         }
         catch (Exception ex)
         {
@@ -165,7 +145,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _operationCancellationTokenSource?.Cancel();
         if (IsRecording)
         {
-            await _audioRecorder.StopAsync(CancellationToken.None);
+            await _dictationWorkflow.CancelAsync(CancellationToken.None);
         }
     }
 
@@ -175,6 +155,4 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     private bool HasText() => !string.IsNullOrWhiteSpace(MemoText);
 
-    private static string AppendText(string currentText, string newText)
-        => string.IsNullOrWhiteSpace(currentText) ? newText : $"{currentText}{Environment.NewLine}{newText}";
 }

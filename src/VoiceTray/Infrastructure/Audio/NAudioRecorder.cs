@@ -1,13 +1,14 @@
 using System.IO;
 using Microsoft.Extensions.Logging;
 using NAudio.Wave;
+using VoiceTray.Contracts.Audio;
+using VoiceTray.Contracts.Settings;
 
 namespace VoiceTray.Infrastructure.Audio;
 
 public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecorder
 {
     private readonly object _gate = new();
-    private readonly string _tempDirectory = Path.Combine(@"A:\", "VoiceTray", "Recordings");
     private WaveInEvent? _waveIn;
     private WaveFileWriter? _writer;
     private DateTimeOffset _startedAt;
@@ -15,7 +16,7 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
 
     public bool IsRecording { get; private set; }
 
-    public Task<AudioRecordingResult> StartAsync(CancellationToken cancellationToken)
+    public Task<AudioRecordingResult> StartAsync(StorageSettings storageSettings, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -26,8 +27,8 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
                 throw new InvalidOperationException("Recording is already running.");
             }
 
-            Directory.CreateDirectory(_tempDirectory);
-            _currentFilePath = Path.Combine(_tempDirectory, $"voicetray-{DateTimeOffset.Now:yyyyMMdd-HHmmss-fff}.wav");
+            Directory.CreateDirectory(storageSettings.RecordingDirectory);
+            _currentFilePath = Path.Combine(storageSettings.RecordingDirectory, $"voicetray-{DateTimeOffset.Now:yyyyMMdd-HHmmss-fff}.wav");
             _startedAt = DateTimeOffset.Now;
 
             _waveIn = new WaveInEvent
@@ -77,15 +78,15 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
         return Task.FromResult(new AudioRecordingResult(filePath, duration));
     }
 
-    public void DeleteOldTemporaryFiles(TimeSpan maxAge)
+    public void DeleteOldTemporaryFiles(StorageSettings storageSettings)
     {
-        if (!Directory.Exists(_tempDirectory))
+        if (!Directory.Exists(storageSettings.RecordingDirectory))
         {
             return;
         }
 
-        var threshold = DateTimeOffset.Now - maxAge;
-        foreach (var filePath in Directory.EnumerateFiles(_tempDirectory, "*.wav"))
+        var threshold = DateTimeOffset.Now - TimeSpan.FromDays(storageSettings.TemporaryFileRetentionDays);
+        foreach (var filePath in Directory.EnumerateFiles(storageSettings.RecordingDirectory, "*.wav"))
         {
             try
             {

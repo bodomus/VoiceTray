@@ -1,12 +1,22 @@
 {
   "HotKey": {
-    "Gesture": "Ctrl+Alt+Space"
+    "Gesture": "Ctrl+Alt+Space",
+    "Modifiers": "Control,Alt",
+    "Key": "Space",
+    "NoRepeat": true
   },
   "Whisper": {
     "ExecutablePath": "tools/whisper/whisper-cli.exe",
     "ModelPath": "models/ggml-base.bin",
     "Language": "ru",
     "ExtraArguments": ""
+  },
+  "Storage": {
+    "RecordingDirectory": "A:\\VoiceTray\\Recordings",
+    "TemporaryFileRetentionDays": 3
+  },
+  "Cancellation": {
+    "RecognitionTimeoutSeconds": 120
   },
   "Behavior": {
     "AutoCopyAfterRecognition": false,
