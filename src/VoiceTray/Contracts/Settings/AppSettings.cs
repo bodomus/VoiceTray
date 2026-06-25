@@ -14,7 +14,7 @@ public sealed record AppSettings(
             "models/ggml-base.bin",
             "ru",
             string.Empty),
-        new StorageSettings(@"A:\VoiceTray\Recordings", 3),
+        new StorageSettings(null, 3),
         new CancellationSettings(120),
         new BehaviorSettings(false, false, false));
 }
@@ -32,7 +32,7 @@ public sealed record WhisperSettings(
     string ExtraArguments);
 
 public sealed record StorageSettings(
-    string RecordingDirectory,
+    string? RecordingDirectory,
     int TemporaryFileRetentionDays);
 
 public sealed record CancellationSettings(

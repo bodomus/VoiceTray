@@ -2,7 +2,6 @@ using System.IO;
 using Microsoft.Extensions.Logging;
 using NAudio.Wave;
 using VoiceTray.Contracts.Audio;
-using VoiceTray.Contracts.Settings;
 
 namespace VoiceTray.Infrastructure.Audio;
 
@@ -16,7 +15,7 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
 
     public bool IsRecording { get; private set; }
 
-    public Task<AudioRecordingResult> StartAsync(StorageSettings storageSettings, CancellationToken cancellationToken)
+    public Task<AudioRecordingResult> StartAsync(AudioRecordingOptions options, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -27,8 +26,8 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
                 throw new InvalidOperationException("Recording is already running.");
             }
 
-            Directory.CreateDirectory(storageSettings.RecordingDirectory);
-            _currentFilePath = Path.Combine(storageSettings.RecordingDirectory, $"voicetray-{DateTimeOffset.Now:yyyyMMdd-HHmmss-fff}.wav");
+            Directory.CreateDirectory(options.RecordingDirectory);
+            _currentFilePath = Path.Combine(options.RecordingDirectory, $"voicetray-{DateTimeOffset.Now:yyyyMMdd-HHmmss-fff}.wav");
             _startedAt = DateTimeOffset.Now;
 
             _waveIn = new WaveInEvent
@@ -78,15 +77,15 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
         return Task.FromResult(new AudioRecordingResult(filePath, duration));
     }
 
-    public void DeleteOldTemporaryFiles(StorageSettings storageSettings)
+    public void DeleteOldTemporaryFiles(AudioRecordingOptions options)
     {
-        if (!Directory.Exists(storageSettings.RecordingDirectory))
+        if (!Directory.Exists(options.RecordingDirectory))
         {
             return;
         }
 
-        var threshold = DateTimeOffset.Now - TimeSpan.FromDays(storageSettings.TemporaryFileRetentionDays);
-        foreach (var filePath in Directory.EnumerateFiles(storageSettings.RecordingDirectory, "*.wav"))
+        var threshold = DateTimeOffset.Now - TimeSpan.FromDays(options.TemporaryFileRetentionDays);
+        foreach (var filePath in Directory.EnumerateFiles(options.RecordingDirectory, "*.wav"))
         {
             try
             {

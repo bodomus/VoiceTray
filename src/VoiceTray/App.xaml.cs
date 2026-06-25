@@ -42,15 +42,17 @@ public partial class App : System.Windows.Application
         var settings = await settingsService.LoadAsync(CancellationToken.None);
         _serviceProvider.GetRequiredService<AppSettingsHolder>().Current = settings;
 
-        _serviceProvider.GetRequiredService<IAudioRecorder>().DeleteOldTemporaryFiles(settings.Storage);
+        _serviceProvider
+            .GetRequiredService<IAudioRecorder>()
+            .DeleteOldTemporaryFiles(AudioRecordingOptionsFactory.FromSettings(settings.Storage));
 
         var window = MainWindowInstance;
         MainWindow = window;
 
         var trayIconService = _serviceProvider.GetRequiredService<ITrayIconService>();
         trayIconService.OpenRequested += (_, _) => ShowMainWindow();
-        trayIconService.StartRequested += async (_, _) => await MainViewModel.StartAsync();
-        trayIconService.StopRequested += async (_, _) => await MainViewModel.StopAsync();
+        trayIconService.StartRequested += (_, _) => MainViewModel.TryStartFromCommand();
+        trayIconService.StopRequested += (_, _) => MainViewModel.TryStopFromCommand();
         trayIconService.SettingsRequested += (_, _) => System.Windows.MessageBox.Show(window, "Settings UI is not implemented yet.", "VoiceTray", MessageBoxButton.OK, MessageBoxImage.Information);
         trayIconService.ExitRequested += async (_, _) => await ExitApplicationAsync();
         trayIconService.Initialize();

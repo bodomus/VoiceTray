@@ -12,7 +12,7 @@
     "ExtraArguments": ""
   },
   "Storage": {
-    "RecordingDirectory": "A:\\VoiceTray\\Recordings",
+    "RecordingDirectory": "%LocalAppData%\\VoiceTray\\Recordings",
     "TemporaryFileRetentionDays": 3
   },
   "Cancellation": {

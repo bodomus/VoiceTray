@@ -13,6 +13,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly ITextPasteService _textPasteService;
     private readonly ILogger<MainWindowViewModel> _logger;
     private CancellationTokenSource? _operationCancellationTokenSource;
+    private Task? _currentOperationTask;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(StartCommand))]
@@ -46,8 +47,48 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public void SetStatus(string status) => StatusText = status;
 
+    public bool TryStartFromCommand()
+    {
+        if (!StartCommand.CanExecute(null))
+        {
+            return false;
+        }
+
+        StartCommand.Execute(null);
+        return true;
+    }
+
+    public bool TryStopFromCommand()
+    {
+        if (!StopCommand.CanExecute(null))
+        {
+            return false;
+        }
+
+        StopCommand.Execute(null);
+        return true;
+    }
+
     [RelayCommand(CanExecute = nameof(CanStart))]
     public async Task StartAsync()
+    {
+        _currentOperationTask = StartCoreAsync();
+        await _currentOperationTask;
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStop))]
+    public async Task StopAsync()
+    {
+        if (!IsRecording)
+        {
+            return;
+        }
+
+        _currentOperationTask = StopCoreAsync();
+        await _currentOperationTask;
+    }
+
+    private async Task StartCoreAsync()
     {
         try
         {
@@ -65,21 +106,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanStop))]
-    public async Task StopAsync()
+    private async Task StopCoreAsync()
     {
-        if (!IsRecording)
-        {
-            return;
-        }
-
         var cancellationToken = _operationCancellationTokenSource?.Token ?? CancellationToken.None;
 
         try
         {
             StatusText = "Recognizing...";
-            var result = await _dictationWorkflow.StopAndRecognizeAsync(MemoText, cancellationToken);
             IsRecording = false;
+            IsRecognizing = true;
+            var result = await _dictationWorkflow.StopAndRecognizeAsync(MemoText, cancellationToken);
             IsRecognizing = false;
 
             if (!string.IsNullOrWhiteSpace(result.RecognizedText))
@@ -143,15 +179,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
     public async Task CancelAsync()
     {
         _operationCancellationTokenSource?.Cancel();
-        if (IsRecording)
+
+        if (IsRecording || IsRecognizing)
         {
             await _dictationWorkflow.CancelAsync(CancellationToken.None);
+        }
+
+        if (_currentOperationTask is not null)
+        {
+            await _currentOperationTask;
         }
     }
 
     private bool CanStart() => !IsRecording && !IsRecognizing;
 
-    private bool CanStop() => IsRecording;
+    private bool CanStop() => IsRecording && !IsRecognizing;
 
     private bool HasText() => !string.IsNullOrWhiteSpace(MemoText);
 

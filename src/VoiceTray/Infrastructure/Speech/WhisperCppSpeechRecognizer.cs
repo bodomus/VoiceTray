@@ -62,7 +62,17 @@ public sealed class WhisperCppSpeechRecognizer(ILogger<WhisperCppSpeechRecognize
         var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
         var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
 
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            await KillProcessTreeAsync(process).ConfigureAwait(false);
+            await SuppressCancelledReadTaskAsync(outputTask, "stdout").ConfigureAwait(false);
+            await SuppressCancelledReadTaskAsync(errorTask, "stderr").ConfigureAwait(false);
+            throw;
+        }
 
         var standardOutput = await outputTask.ConfigureAwait(false);
         var standardError = await errorTask.ConfigureAwait(false);
@@ -107,5 +117,50 @@ public sealed class WhisperCppSpeechRecognizer(ILogger<WhisperCppSpeechRecognize
             .ToArray();
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    private async Task KillProcessTreeAsync(Process process)
+    {
+        if (process.HasExited)
+        {
+            return;
+        }
+
+        try
+        {
+            logger.LogWarning("Cancellation requested. Killing whisper.cpp process tree. PID={ProcessId}", process.Id);
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to kill whisper.cpp process tree. PID={ProcessId}", process.Id);
+            throw;
+        }
+
+        await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task SuppressCancelledReadTaskAsync(Task<string> readTask, string streamName)
+    {
+        try
+        {
+            await readTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogDebug("Suppressed cancelled whisper.cpp {StreamName} read task.", streamName);
+        }
+        catch (ObjectDisposedException)
+        {
+            logger.LogDebug("Suppressed disposed whisper.cpp {StreamName} read task.", streamName);
+        }
+        catch (IOException ex)
+        {
+            logger.LogDebug(ex, "Suppressed whisper.cpp {StreamName} read task I/O error after cancellation.", streamName);
+        }
     }
 }

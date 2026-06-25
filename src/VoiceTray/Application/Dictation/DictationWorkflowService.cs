@@ -20,7 +20,8 @@ public sealed class DictationWorkflowService(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        await audioRecorder.StartAsync(settingsHolder.Current.Storage, cancellationToken).ConfigureAwait(false);
+        var options = AudioRecordingOptionsFactory.FromSettings(settingsHolder.Current.Storage);
+        await audioRecorder.StartAsync(options, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<DictationWorkflowResult> StopAndRecognizeAsync(string currentText, CancellationToken cancellationToken)

@@ -17,6 +17,14 @@ dotnet build
 dotnet run --project src/VoiceTray/VoiceTray.csproj
 ```
 
+## Tests
+
+```bash
+dotnet test
+```
+
+The test project currently covers focused lifecycle/configuration regressions for dictation start/stop/recognize flow, recognition timeout, cancel during recognition, hotkey validation, settings normalization, and recording storage path resolution.
+
 ## Settings
 
 On first launch the app creates `settings.json` near `VoiceTray.exe`. A reference file is also included as `settings.example.json`.
@@ -36,7 +44,7 @@ On first launch the app creates `settings.json` near `VoiceTray.exe`. A referenc
     "ExtraArguments": ""
   },
   "Storage": {
-    "RecordingDirectory": "A:\\VoiceTray\\Recordings",
+    "RecordingDirectory": "%LocalAppData%\\VoiceTray\\Recordings",
     "TemporaryFileRetentionDays": 3
   },
   "Cancellation": {
@@ -56,14 +64,26 @@ Relative paths are resolved from the application directory.
 
 `Storage` controls where WAV recordings are written and how many days temporary files are retained. `Cancellation` controls the recognition timeout. `HotKey` exposes the gesture, modifier list, key, and `MOD_NOREPEAT` behavior explicitly.
 
+If `RecordingDirectory` is empty or missing, VoiceTray uses `%LocalAppData%\VoiceTray\Recordings`. Environment variables in the configured path are expanded at runtime.
+
+Invalid hotkey settings are not silently rewritten. Unknown modifiers or keys are logged as warnings, and hotkey registration is skipped while the app continues to run.
+
 ## Architecture
 
 VoiceTray keeps contracts, application workflow, and infrastructure implementations separated:
 
 - `Contracts/` contains service interfaces, settings DTOs, and shared DTOs.
+- `Shared/` contains small cross-layer helpers that are not service contracts, such as storage path resolution.
 - `Application/Dictation/` contains the dictation workflow service that coordinates recording, recognition, auto-copy, auto-paste, and cancellation behavior.
 - `Infrastructure/` contains Windows, NAudio, whisper.cpp, JSON settings, tray, clipboard, hotkey, and logging implementations.
 - `MainWindowViewModel` coordinates UI state and delegates dictation flow to `IDictationWorkflowService`.
+- Audio recording receives resolved `AudioRecordingOptions`; application settings are translated before crossing into the recorder port.
+
+Recognition cancellation is process-tree aware: if the recognition operation is cancelled or times out, VoiceTray kills the external `whisper-cli.exe` process tree and waits for it to exit before returning control to the UI.
+
+Tray start/stop actions go through the same command availability checks as the main window buttons.
+
+Application shutdown cancels and awaits the active dictation operation, including recognition cleanup, before disposing hotkeys and tray resources.
 
 ## Hotkey
 

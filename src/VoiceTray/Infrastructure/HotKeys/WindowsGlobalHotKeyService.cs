@@ -25,13 +25,28 @@ public sealed class WindowsGlobalHotKeyService(ILogger<WindowsGlobalHotKeyServic
 
     public bool Register(Window window, HotKeySettings settings)
     {
+        var hotKeyConfiguration = HotKeyConfigurationParser.TryParse(settings);
+        if (!hotKeyConfiguration.IsValid)
+        {
+            logger.LogWarning(
+                "Hotkey configuration is invalid. {ErrorMessage} Gesture={Gesture}, Modifiers={Modifiers}, Key={Key}, NoRepeat={NoRepeat}",
+                hotKeyConfiguration.ErrorMessage,
+                settings.Gesture,
+                settings.Modifiers,
+                settings.Key,
+                settings.NoRepeat);
+            return false;
+        }
+
         _windowHandle = new WindowInteropHelper(window).EnsureHandle();
         _source = HwndSource.FromHwnd(_windowHandle);
         _source?.AddHook(WndProc);
 
-        var modifiers = ResolveModifiers(settings);
-        var key = ResolveKey(settings);
-        var success = RegisterHotKey(_windowHandle, HotKeyId, modifiers, (uint)KeyInterop.VirtualKeyFromKey(key));
+        var success = RegisterHotKey(
+            _windowHandle,
+            HotKeyId,
+            hotKeyConfiguration.Modifiers,
+            (uint)KeyInterop.VirtualKeyFromKey(hotKeyConfiguration.Key));
         _registered = success;
 
         if (success)
@@ -75,25 +90,4 @@ public sealed class WindowsGlobalHotKeyService(ILogger<WindowsGlobalHotKeyServic
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
 
-    private static uint ResolveModifiers(HotKeySettings settings)
-    {
-        uint modifiers = settings.NoRepeat ? ModNoRepeat : 0;
-
-        foreach (var modifier in settings.Modifiers.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            modifiers |= modifier.ToLowerInvariant() switch
-            {
-                "alt" => ModAlt,
-                "control" or "ctrl" => ModControl,
-                "shift" => ModShift,
-                "win" or "windows" => ModWin,
-                _ => 0
-            };
-        }
-
-        return modifiers;
-    }
-
-    private static Key ResolveKey(HotKeySettings settings)
-        => Enum.TryParse<Key>(settings.Key, ignoreCase: true, out var key) ? key : Key.Space;
 }
