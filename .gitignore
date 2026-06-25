@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+src/**/bin/
+src/**/obj/
+
+logs/
+settings.json
+A:/VoiceTray/
+
+# Whisper model files are too large for normal GitHub pushes.
+src/VoiceTray/models/*.bin
+models/*.bin

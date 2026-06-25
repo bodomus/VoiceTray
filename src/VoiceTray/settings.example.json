@@ -1,0 +1,16 @@
+{
+  "HotKey": {
+    "Gesture": "Ctrl+Alt+Space"
+  },
+  "Whisper": {
+    "ExecutablePath": "tools/whisper/whisper-cli.exe",
+    "ModelPath": "models/ggml-base.bin",
+    "Language": "ru",
+    "ExtraArguments": ""
+  },
+  "Behavior": {
+    "AutoCopyAfterRecognition": false,
+    "AutoPasteAfterRecognition": false,
+    "HideWindowOnPaste": false
+  }
+}
