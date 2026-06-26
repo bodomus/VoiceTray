@@ -1,0 +1,158 @@
+<Window x:Class="VoiceTray.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="VoiceTray Settings"
+        Width="640"
+        Height="520"
+        Icon="Assets/VoiceTray.ico"
+        MinWidth="520"
+        MinHeight="420"
+        WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,10,8" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Margin" Value="0,0,0,8" />
+            <Setter Property="MinWidth" Value="260" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="MinWidth" Value="78" />
+            <Setter Property="Margin" Value="8,0,0,0" />
+            <Setter Property="Padding" Value="10,4" />
+        </Style>
+        <Style x:Key="FieldGridStyle" TargetType="Grid">
+            <Setter Property="Margin" Value="0,12,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="14">
+        <StackPanel DockPanel.Dock="Bottom">
+            <TextBlock Margin="0,8,0,8"
+                       Foreground="#555555"
+                       Text="{Binding StatusMessage}"
+                       TextWrapping="Wrap" />
+            <StackPanel HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button Command="{Binding ResetToDefaultsCommand}"
+                        Content="Reset to defaults" />
+                <Button Command="{Binding SaveCommand}"
+                        Content="Save"
+                        IsDefault="True" />
+                <Button Command="{Binding CancelCommand}"
+                        Content="Cancel"
+                        IsCancel="True" />
+            </StackPanel>
+        </StackPanel>
+
+        <TabControl>
+            <TabItem Header="Hotkey">
+                <Grid Style="{StaticResource FieldGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Gesture" />
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding HotKeyGesture, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Modifiers" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding HotKeyModifiers, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Key" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding HotKeyKey, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <CheckBox Grid.Row="3"
+                              Grid.Column="1"
+                              Margin="0,2,0,8"
+                              Content="No repeat"
+                              IsChecked="{Binding HotKeyNoRepeat}" />
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Whisper">
+                <Grid Style="{StaticResource FieldGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Executable" />
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding WhisperExecutablePath, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Row="0" Grid.Column="2" Click="BrowseWhisperExecutable" Content="Browse" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Model" />
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding WhisperModelPath, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Row="1" Grid.Column="2" Click="BrowseWhisperModel" Content="Browse" />
+
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Language" />
+                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding WhisperLanguage, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Extra arguments" />
+                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding WhisperExtraArguments, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Storage">
+                <Grid Style="{StaticResource FieldGridStyle}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Recording folder" />
+                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding RecordingDirectory, UpdateSourceTrigger=PropertyChanged}" />
+                    <Button Grid.Row="0" Grid.Column="2" Click="BrowseRecordingDirectory" Content="Browse" />
+
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Retention days" />
+                    <TextBox Grid.Row="1"
+                             Grid.Column="1"
+                             Text="{Binding TemporaryFileRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Behavior">
+                <StackPanel Margin="0,12,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Timeout seconds" />
+                        <TextBox Grid.Column="1"
+                                 Text="{Binding RecognitionTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                    </Grid>
+
+                    <CheckBox Margin="0,4,0,8"
+                              Content="Auto copy after recognition"
+                              IsChecked="{Binding AutoCopyAfterRecognition}" />
+                    <CheckBox Margin="0,0,0,8"
+                              Content="Auto paste after recognition"
+                              IsChecked="{Binding AutoPasteAfterRecognition}" />
+                    <CheckBox Margin="0,0,0,8"
+                              Content="Hide window on paste"
+                              IsChecked="{Binding HideWindowOnPaste}" />
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

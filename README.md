@@ -29,6 +29,8 @@ The test project currently covers focused lifecycle/configuration regressions fo
 
 On first launch the app creates `settings.json` near `VoiceTray.exe`. A reference file is also included as `settings.example.json`.
 
+Use the tray menu `Settings` item to edit the same configuration from the app. The settings window can update hotkey, whisper.cpp, storage, cancellation, and behavior values, then save them back to `settings.json`. Runtime settings such as whisper, storage, cancellation, and behavior apply to subsequent dictation operations after saving. Hotkey changes are saved, but take effect after restarting VoiceTray.
+
 ```json
 {
   "HotKey": {
@@ -120,4 +122,3 @@ VoiceTray includes a custom microphone icon used by the executable, the WPF wind
 - Recognition is not streaming.
 - Text appears after `Stop`.
 - Auto-paste depends on Windows accepting focus and synthetic `Ctrl+V`.
-- Settings UI is a placeholder in the MVP.

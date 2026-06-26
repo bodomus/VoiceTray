@@ -53,7 +53,7 @@ public partial class App : System.Windows.Application
         trayIconService.OpenRequested += (_, _) => ShowMainWindow();
         trayIconService.StartRequested += (_, _) => MainViewModel.TryStartFromCommand();
         trayIconService.StopRequested += (_, _) => MainViewModel.TryStopFromCommand();
-        trayIconService.SettingsRequested += (_, _) => System.Windows.MessageBox.Show(window, "Settings UI is not implemented yet.", "VoiceTray", MessageBoxButton.OK, MessageBoxImage.Information);
+        trayIconService.SettingsRequested += (_, _) => OpenSettingsWindow();
         trayIconService.ExitRequested += async (_, _) => await ExitApplicationAsync();
         trayIconService.Initialize();
 
@@ -78,6 +78,8 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IDictationWorkflowService, DictationWorkflowService>();
         services.AddSingleton<MainWindowViewModel>();
         services.AddSingleton<MainWindow>();
+        services.AddTransient<SettingsWindowViewModel>();
+        services.AddTransient<SettingsWindow>();
 
         services.AddLogging(builder =>
         {
@@ -91,6 +93,30 @@ public partial class App : System.Windows.Application
     {
         _serviceProvider!.GetRequiredService<ITextPasteService>().CaptureTargetWindow();
         MainWindowInstance.ShowAndActivate();
+    }
+
+    private void OpenSettingsWindow()
+    {
+        var window = MainWindowInstance;
+        var settingsWindow = _serviceProvider!.GetRequiredService<SettingsWindow>();
+        settingsWindow.Owner = window;
+
+        var saved = settingsWindow.ShowDialog() == true;
+        if (!saved || settingsWindow.DataContext is not SettingsWindowViewModel viewModel)
+        {
+            return;
+        }
+
+        MainViewModel.SetStatus(viewModel.StatusMessage);
+        if (viewModel.RestartRequired)
+        {
+            System.Windows.MessageBox.Show(
+                window,
+                "Hotkey changes will take effect after restart.",
+                "VoiceTray",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
     }
 
     private async Task ExitApplicationAsync()

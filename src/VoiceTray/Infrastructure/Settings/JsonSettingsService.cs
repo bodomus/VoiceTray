@@ -6,7 +6,7 @@ using VoiceTray.Shared.Storage;
 
 namespace VoiceTray.Infrastructure.Settings;
 
-public sealed class JsonSettingsService(ILogger<JsonSettingsService> logger) : ISettingsService
+public sealed class JsonSettingsService : ISettingsService
 {
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
@@ -14,7 +14,19 @@ public sealed class JsonSettingsService(ILogger<JsonSettingsService> logger) : I
         WriteIndented = true
     };
 
-    private readonly string _settingsPath = Path.Combine(AppContext.BaseDirectory, "settings.json");
+    private readonly ILogger<JsonSettingsService> _logger;
+    private readonly string _settingsPath;
+
+    public JsonSettingsService(ILogger<JsonSettingsService> logger)
+        : this(logger, Path.Combine(AppContext.BaseDirectory, "settings.json"))
+    {
+    }
+
+    public JsonSettingsService(ILogger<JsonSettingsService> logger, string settingsPath)
+    {
+        _logger = logger;
+        _settingsPath = settingsPath;
+    }
 
     public async Task<AppSettings> LoadAsync(CancellationToken cancellationToken)
     {
@@ -38,7 +50,7 @@ public sealed class JsonSettingsService(ILogger<JsonSettingsService> logger) : I
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            logger.LogError(ex, "Failed to load settings.json. Defaults will be used.");
+            _logger.LogError(ex, "Failed to load settings.json. Defaults will be used.");
             return AppSettings.Default;
         }
     }
@@ -46,8 +58,9 @@ public sealed class JsonSettingsService(ILogger<JsonSettingsService> logger) : I
     private async Task SaveDefaultAsync(CancellationToken cancellationToken)
         => await SaveAsync(AppSettings.Default, cancellationToken).ConfigureAwait(false);
 
-    private async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken)
+    public async Task SaveAsync(AppSettings settings, CancellationToken cancellationToken)
     {
+        settings = AppSettingsNormalizer.Normalize(settings);
         Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
         await using var stream = File.Create(_settingsPath);
         await JsonSerializer.SerializeAsync(stream, settings, SerializerOptions, cancellationToken).ConfigureAwait(false);
