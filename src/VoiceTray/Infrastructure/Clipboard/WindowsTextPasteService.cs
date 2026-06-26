@@ -8,14 +8,21 @@ public sealed class WindowsTextPasteService(
     IClipboardService clipboardService,
     ILogger<WindowsTextPasteService> logger) : ITextPasteService
 {
-    private const ushort VkControl = 0x11;
-    private const ushort VkV = 0x56;
-    private const uint KeyEventFKeyUp = 0x0002;
+    private readonly IWindowsPastePlatform _platform = new WindowsPastePlatform();
     private IntPtr _targetWindow;
+
+    internal WindowsTextPasteService(
+        IClipboardService clipboardService,
+        ILogger<WindowsTextPasteService> logger,
+        IWindowsPastePlatform platform)
+        : this(clipboardService, logger)
+    {
+        _platform = platform;
+    }
 
     public void CaptureTargetWindow()
     {
-        var foregroundWindow = GetForegroundWindow();
+        var foregroundWindow = _platform.GetForegroundWindow();
         if (foregroundWindow != IntPtr.Zero)
         {
             _targetWindow = foregroundWindow;
@@ -31,69 +38,116 @@ public sealed class WindowsTextPasteService(
             throw new InvalidOperationException("Target window is unknown.");
         }
 
-        SetForegroundWindow(_targetWindow);
+        if (!_platform.IsWindow(_targetWindow))
+        {
+            throw new InvalidOperationException("Target window is no longer available.");
+        }
+
+        if (!_platform.SetForegroundWindow(_targetWindow))
+        {
+            throw new InvalidOperationException("Failed to focus target window.");
+        }
+
         await Task.Delay(150, cancellationToken).ConfigureAwait(false);
 
-        var inputs = new[]
+        if (_platform.GetForegroundWindow() != _targetWindow)
         {
-            CreateKeyboardInput(VkControl, 0),
-            CreateKeyboardInput(VkV, 0),
-            CreateKeyboardInput(VkV, KeyEventFKeyUp),
-            CreateKeyboardInput(VkControl, KeyEventFKeyUp)
-        };
+            throw new InvalidOperationException("Target window did not regain focus.");
+        }
 
-        var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
-        if (sent != inputs.Length)
+        var sent = _platform.SendPasteShortcut();
+        if (!sent)
         {
-            logger.LogWarning("SendInput sent {SentCount} of {InputCount} events.", sent, inputs.Length);
+            logger.LogWarning("SendInput failed to send Ctrl+V.");
             throw new InvalidOperationException("Failed to send Ctrl+V.");
         }
     }
 
-    private static Input CreateKeyboardInput(ushort virtualKey, uint flags)
-        => new()
+    internal interface IWindowsPastePlatform
+    {
+        IntPtr GetForegroundWindow();
+
+        bool IsWindow(IntPtr hWnd);
+
+        bool SetForegroundWindow(IntPtr hWnd);
+
+        bool SendPasteShortcut();
+    }
+
+    private sealed class WindowsPastePlatform : IWindowsPastePlatform
+    {
+        private const ushort VkControl = 0x11;
+        private const ushort VkV = 0x56;
+        private const uint KeyEventFKeyUp = 0x0002;
+
+        public bool SendPasteShortcut()
         {
-            Type = 1,
-            Union = new InputUnion
+            var inputs = new[]
             {
-                KeyboardInput = new KeyboardInput
+                CreateKeyboardInput(VkControl, 0),
+                CreateKeyboardInput(VkV, 0),
+                CreateKeyboardInput(VkV, KeyEventFKeyUp),
+                CreateKeyboardInput(VkControl, KeyEventFKeyUp)
+            };
+
+            var sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<Input>());
+            return sent == inputs.Length;
+        }
+
+        private static Input CreateKeyboardInput(ushort virtualKey, uint flags)
+            => new()
+            {
+                Type = 1,
+                Union = new InputUnion
                 {
-                    VirtualKey = virtualKey,
-                    Flags = flags
+                    KeyboardInput = new KeyboardInput
+                    {
+                        VirtualKey = virtualKey,
+                        Flags = flags
+                    }
                 }
-            }
-        };
+            };
 
-    [DllImport("user32.dll")]
-    private static extern IntPtr GetForegroundWindow();
+        public IntPtr GetForegroundWindow() => NativeGetForegroundWindow();
 
-    [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(IntPtr hWnd);
+        public bool IsWindow(IntPtr hWnd) => NativeIsWindow(hWnd);
 
-    [DllImport("user32.dll", SetLastError = true)]
-    private static extern uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
+        public bool SetForegroundWindow(IntPtr hWnd) => NativeSetForegroundWindow(hWnd);
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct Input
-    {
-        public uint Type;
-        public InputUnion Union;
-    }
+        [DllImport("user32.dll")]
+        private static extern IntPtr NativeGetForegroundWindow();
 
-    [StructLayout(LayoutKind.Explicit)]
-    private struct InputUnion
-    {
-        [FieldOffset(0)]
-        public KeyboardInput KeyboardInput;
-    }
+        [DllImport("user32.dll")]
+        private static extern bool NativeIsWindow(IntPtr hWnd);
 
-    [StructLayout(LayoutKind.Sequential)]
-    private struct KeyboardInput
-    {
-        public ushort VirtualKey;
-        public ushort Scan;
-        public uint Flags;
-        public uint Time;
-        public IntPtr ExtraInfo;
+        [DllImport("user32.dll")]
+        private static extern bool NativeSetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint nInputs, Input[] pInputs, int cbSize);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct Input
+        {
+            public uint Type;
+            public InputUnion Union;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct InputUnion
+        {
+            [FieldOffset(0)]
+            public KeyboardInput KeyboardInput;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KeyboardInput
+        {
+            public ushort VirtualKey;
+            public ushort Scan;
+            public uint Flags;
+            public uint Time;
+            public IntPtr ExtraInfo;
+        }
     }
 }

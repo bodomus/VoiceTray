@@ -61,9 +61,12 @@ public partial class App : System.Windows.Application
         hotKeyService.HotKeyPressed += (_, _) => ShowMainWindow();
         if (!hotKeyService.Register(window, settings.HotKey))
         {
-            MainViewModel.SetStatus("Hotkey registration failed: Ctrl+Alt+Space is unavailable.");
+            MainViewModel.SetStatus(CreateHotKeyRegistrationFailureStatus(settings.HotKey));
         }
     }
+
+    internal static string CreateHotKeyRegistrationFailureStatus(HotKeySettings settings)
+        => $"Hotkey registration failed: {settings.Gesture} is unavailable.";
 
     private static void ConfigureServices(IServiceCollection services)
     {

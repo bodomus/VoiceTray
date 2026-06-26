@@ -5,13 +5,27 @@ using VoiceTray.Contracts.Audio;
 
 namespace VoiceTray.Infrastructure.Audio;
 
-public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecorder
+public sealed class NAudioRecorder : IAudioRecorder
 {
     private readonly object _gate = new();
-    private WaveInEvent? _waveIn;
+    private readonly ILogger<NAudioRecorder> _logger;
+    private readonly Func<IWaveInDevice> _waveInDeviceFactory;
+    private IWaveInDevice? _waveIn;
     private WaveFileWriter? _writer;
+    private TaskCompletionSource<StoppedEventArgs>? _recordingStopped;
     private DateTimeOffset _startedAt;
     private string? _currentFilePath;
+
+    public NAudioRecorder(ILogger<NAudioRecorder> logger)
+        : this(logger, static () => new WaveInDevice())
+    {
+    }
+
+    internal NAudioRecorder(ILogger<NAudioRecorder> logger, Func<IWaveInDevice> waveInDeviceFactory)
+    {
+        _logger = logger;
+        _waveInDeviceFactory = waveInDeviceFactory;
+    }
 
     public bool IsRecording { get; private set; }
 
@@ -30,29 +44,27 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
             _currentFilePath = Path.Combine(options.RecordingDirectory, $"voicetray-{DateTimeOffset.Now:yyyyMMdd-HHmmss-fff}.wav");
             _startedAt = DateTimeOffset.Now;
 
-            _waveIn = new WaveInEvent
-            {
-                DeviceNumber = 0,
-                WaveFormat = new WaveFormat(16000, 16, 1),
-                BufferMilliseconds = 100
-            };
+            _waveIn = _waveInDeviceFactory();
             _writer = new WaveFileWriter(_currentFilePath, _waveIn.WaveFormat);
+            _recordingStopped = new TaskCompletionSource<StoppedEventArgs>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
 
             _waveIn.DataAvailable += OnDataAvailable;
             _waveIn.RecordingStopped += OnRecordingStopped;
             _waveIn.StartRecording();
 
             IsRecording = true;
-            logger.LogInformation("Recording started. WAV: {FilePath}", _currentFilePath);
+            _logger.LogInformation("Recording started. WAV: {FilePath}", _currentFilePath);
             return Task.FromResult(new AudioRecordingResult(_currentFilePath, TimeSpan.Zero));
         }
     }
 
-    public Task<AudioRecordingResult> StopAsync(CancellationToken cancellationToken)
+    public async Task<AudioRecordingResult> StopAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        WaveInEvent waveIn;
+        IWaveInDevice waveIn;
+        Task<StoppedEventArgs> recordingStopped;
         string filePath;
         DateTimeOffset startedAt;
 
@@ -64,17 +76,25 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
             }
 
             waveIn = _waveIn;
+            recordingStopped = _recordingStopped?.Task
+                ?? throw new InvalidOperationException("Recording stop signal is not initialized.");
             filePath = _currentFilePath;
             startedAt = _startedAt;
             IsRecording = false;
         }
 
         waveIn.StopRecording();
+        var stoppedEvent = await recordingStopped.ConfigureAwait(false);
         DisposeRecordingObjects();
 
+        if (stoppedEvent.Exception is not null)
+        {
+            throw new InvalidOperationException("Recording stopped with an error.", stoppedEvent.Exception);
+        }
+
         var duration = DateTimeOffset.Now - startedAt;
-        logger.LogInformation("Recording stopped. WAV: {FilePath}", filePath);
-        return Task.FromResult(new AudioRecordingResult(filePath, duration));
+        _logger.LogInformation("Recording stopped. WAV: {FilePath}", filePath);
+        return new AudioRecordingResult(filePath, duration);
     }
 
     public void DeleteOldTemporaryFiles(AudioRecordingOptions options)
@@ -96,7 +116,7 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
             }
             catch (IOException ex)
             {
-                logger.LogWarning(ex, "Failed to delete temporary file {FilePath}", filePath);
+                _logger.LogWarning(ex, "Failed to delete temporary file {FilePath}", filePath);
             }
         }
     }
@@ -114,8 +134,10 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
     {
         if (e.Exception is not null)
         {
-            logger.LogError(e.Exception, "Recording stopped with an error.");
+            _logger.LogError(e.Exception, "Recording stopped with an error.");
         }
+
+        _recordingStopped?.TrySetResult(e);
     }
 
     private void DisposeRecordingObjects()
@@ -132,7 +154,51 @@ public sealed class NAudioRecorder(ILogger<NAudioRecorder> logger) : IAudioRecor
             _writer?.Dispose();
             _waveIn = null;
             _writer = null;
+            _recordingStopped = null;
             _currentFilePath = null;
         }
+    }
+
+    internal interface IWaveInDevice : IDisposable
+    {
+        event EventHandler<WaveInEventArgs>? DataAvailable;
+
+        event EventHandler<StoppedEventArgs>? RecordingStopped;
+
+        WaveFormat WaveFormat { get; }
+
+        void StartRecording();
+
+        void StopRecording();
+    }
+
+    private sealed class WaveInDevice : IWaveInDevice
+    {
+        private readonly WaveInEvent _waveIn = new()
+        {
+            DeviceNumber = 0,
+            WaveFormat = new WaveFormat(16000, 16, 1),
+            BufferMilliseconds = 100
+        };
+
+        public event EventHandler<WaveInEventArgs>? DataAvailable
+        {
+            add => _waveIn.DataAvailable += value;
+            remove => _waveIn.DataAvailable -= value;
+        }
+
+        public event EventHandler<StoppedEventArgs>? RecordingStopped
+        {
+            add => _waveIn.RecordingStopped += value;
+            remove => _waveIn.RecordingStopped -= value;
+        }
+
+        public WaveFormat WaveFormat => _waveIn.WaveFormat;
+
+        public void StartRecording() => _waveIn.StartRecording();
+
+        public void StopRecording() => _waveIn.StopRecording();
+
+        public void Dispose() => _waveIn.Dispose();
     }
 }
