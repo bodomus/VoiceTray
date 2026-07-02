@@ -50,4 +50,4 @@ jobs:
 
       - name: Test
         run: dotnet test $env:SOLUTION_FILE --configuration Release --no-build --verbosity normal
-```
+
