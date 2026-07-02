@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VoiceTray.Contracts.Settings;
+using VoiceTray.Infrastructure.HotKeys;
 using VoiceTray.Infrastructure.Settings;
 
 namespace VoiceTray;
@@ -73,6 +74,18 @@ public sealed partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     public async Task SaveAsync()
     {
+        var validationResult = Validate();
+        if (!validationResult.IsValid)
+        {
+            StatusMessage = validationResult.Message;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(HotKeyGesture))
+        {
+            HotKeyGesture = CreateGesturePreview(HotKeyModifiers, HotKeyKey);
+        }
+
         var updatedSettings = AppSettingsNormalizer.Normalize(ToSettings());
         await _settingsService.SaveAsync(updatedSettings, CancellationToken.None);
         _settingsHolder.Current = updatedSettings;
@@ -95,6 +108,57 @@ public sealed partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private void Cancel()
         => CloseRequested?.Invoke(this, false);
+
+    internal SettingsValidationResult Validate()
+    {
+        var hotKey = new HotKeySettings(
+            HotKeyGesture,
+            HotKeyModifiers,
+            HotKeyKey,
+            HotKeyNoRepeat);
+        var hotKeyResult = HotKeyConfigurationParser.TryParse(hotKey);
+        if (!hotKeyResult.IsValid)
+        {
+            return SettingsValidationResult.Invalid($"Invalid hotkey: {hotKeyResult.ErrorMessage}");
+        }
+
+        if (string.IsNullOrWhiteSpace(WhisperExecutablePath))
+        {
+            return SettingsValidationResult.Invalid("Invalid whisper settings: executable path must not be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(WhisperModelPath))
+        {
+            return SettingsValidationResult.Invalid("Invalid whisper settings: model path must not be empty.");
+        }
+
+        if (string.IsNullOrWhiteSpace(WhisperLanguage))
+        {
+            return SettingsValidationResult.Invalid("Invalid whisper settings: language must not be empty.");
+        }
+
+        if (string.Equals(WhisperLanguage, "auto", StringComparison.OrdinalIgnoreCase))
+        {
+            return SettingsValidationResult.Invalid("Invalid whisper settings: language auto is not supported in Settings. Use ru, en, or uk.");
+        }
+
+        if (!IsAllowedLanguage(WhisperLanguage))
+        {
+            return SettingsValidationResult.Invalid("Invalid whisper settings: language must be ru, en, or uk.");
+        }
+
+        if (TemporaryFileRetentionDays <= 0)
+        {
+            return SettingsValidationResult.Invalid("Invalid storage settings: temporary file retention days must be greater than 0.");
+        }
+
+        if (RecognitionTimeoutSeconds < 5)
+        {
+            return SettingsValidationResult.Invalid("Invalid cancellation settings: recognition timeout must be at least 5 seconds.");
+        }
+
+        return SettingsValidationResult.Valid();
+    }
 
     private void LoadFromSettings(AppSettings settings)
     {
@@ -133,4 +197,28 @@ public sealed partial class SettingsWindowViewModel : ObservableObject
                 AutoCopyAfterRecognition,
                 AutoPasteAfterRecognition,
                 HideWindowOnPaste));
+
+    private static bool IsAllowedLanguage(string language)
+        => string.Equals(language, "ru", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(language, "en", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(language, "uk", StringComparison.OrdinalIgnoreCase);
+
+    private static string CreateGesturePreview(string modifiers, string key)
+        => string.Join(
+            '+',
+            modifiers
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(static modifier => string.Equals(modifier, "Control", StringComparison.OrdinalIgnoreCase)
+                    ? "Ctrl"
+                    : modifier))
+            + $"+{key.Trim()}";
+}
+
+internal sealed record SettingsValidationResult(bool IsValid, string Message)
+{
+    public static SettingsValidationResult Valid()
+        => new(true, string.Empty);
+
+    public static SettingsValidationResult Invalid(string message)
+        => new(false, message);
 }
