@@ -25,6 +25,10 @@ dotnet test
 
 The test project currently covers focused lifecycle/configuration regressions for dictation start/stop/recognize flow, recognition timeout, cancel during recognition, hotkey validation, settings normalization, and recording storage path resolution.
 
+## Development Workflow
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the .NET SDK requirement, restore/build/test commands, branch naming, PR target, and local files that should not be committed.
+
 ## Settings
 
 On first launch the app creates `settings.json` near `VoiceTray.exe`. A reference file is also included as `settings.example.json`.
